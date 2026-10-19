@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Neuroflow · Spike Console</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="21" height="21" fill="none" stroke="currentColor"
+               stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 19h4l3-10 4 17 4-23 4 16 3-7h6" />
+          </svg>
+        </span>
+        <div class="titles">
+          <span class="eyebrow">Neuroflow</span>
+          <h1>Spike Console</h1>
+        </div>
+      </div>
+
+      <div class="topmeta">
+        <div class="pill" title="Active signal source">
+          <span class="led" id="sourceLed"></span>
+          <span id="sourceLabel">Simulator</span>
+        </div>
+        <div class="pill">
+          <span class="rec" id="recLed"></span>
+          <span id="statusText">Idle</span>
+          <span class="pill-sep"></span>
+          <span class="mono dim" id="connText">live</span>
+        </div>
+        <div class="clock">
+          <span class="mono" id="elapsed">00:00</span>
+          <span class="muted">elapsed</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="panel controls">
+      <div class="ctl-buttons">
+        <button id="btnStart" class="btn primary">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 2.3v11.4L13.2 8z" fill="currentColor"/></svg>
+          Start sampling
+        </button>
+        <button id="btnStop" class="btn" disabled>
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg>
+          Stop
+        </button>
+        <button id="btnReset" class="btn ghost">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.7" /><path d="M13.4 2.2v3.2h-3.2" />
+          </svg>
+          Reset
+        </button>
+      </div>
+
+      <div class="ctl threshold">
+        <div class="ctl-head">
+          <label for="threshold">Spike threshold</label>
+          <output id="thresholdOut" class="mono">50 µV</output>
+        </div>
+        <input id="threshold" type="range" min="10" max="300" step="1" value="50" />
+        <div class="scale"><span>10</span><span>300 µV</span></div>
+      </div>
+
+      <div class="ctl narrow">
+        <div class="ctl-head"><label for="rate">Sample rate</label></div>
+        <select id="rate">
+          <option value="64">64 /s</option>
+          <option value="128" selected>128 /s</option>
+          <option value="256">256 /s</option>
+          <option value="512">512 /s</option>
+        </select>
+      </div>
+
+      <div class="ctl narrow">
+        <div class="ctl-head"><label for="refractory">Refractory</label></div>
+        <div class="unit-field">
+          <input id="refractory" type="number" min="0" max="500" step="1" value="4" />
+          <span>smp</span>
+        </div>
+      </div>
+
+      <div class="ctl exports">
+        <div class="ctl-head"><span>Export</span></div>
+        <div class="btn-row">
+          <a class="btn ghost sm" href="/api/export/samples.csv">Samples</a>
+          <a class="btn ghost sm" href="/api/export/spikes.csv">Spikes</a>
+        </div>
+      </div>
+
+      <div class="ctl-settings">
+        <div class="ctl">
+          <div class="ctl-head"><label for="source">Signal source</label></div>
+          <select id="source">
+            <option value="sim">Simulator (demo)</option>
+            <option value="device">Neuroflow device</option>
+          </select>
+        </div>
+
+        <div class="ctl grow" id="urlWrap" hidden>
+          <div class="ctl-head">
+            <label for="deviceUrl">Device endpoint</label>
+            <span class="hint">JSON · GET</span>
+          </div>
+          <input id="deviceUrl" type="text" spellcheck="false" autocomplete="off"
+                 placeholder="http://127.0.0.1:8080/sample" />
+        </div>
+
+        <div class="ctl" id="activityWrap">
+          <div class="ctl-head">
+            <label for="activity">Sim. activity</label>
+            <output id="activityOut" class="mono">45%</output>
+          </div>
+          <input id="activity" type="range" min="0" max="100" step="1" value="45" />
+        </div>
+
+        <div class="ctl" id="noiseWrap">
+          <div class="ctl-head">
+            <label for="noise">Noise</label>
+            <output id="noiseOut" class="mono">5.5</output>
+          </div>
+          <input id="noise" type="range" min="0" max="30" step="0.5" value="5.5" />
+        </div>
+
+        <div class="ctl session">
+          <div class="ctl-head"><span>Session</span></div>
+          <div class="mono session-id" id="sessionId">—</div>
+        </div>
+      </div>
+
+      <div class="notice" id="notice" hidden></div>
+    </section>
+
+    <section class="stats">
+      <div class="panel tile">
+        <span class="tile-label">Samples recorded</span>
+        <span class="tile-value mono" id="statSamples">0</span>
+        <span class="tile-sub" id="statSamplesSub">n since reset</span>
+      </div>
+      <div class="panel tile">
+        <span class="tile-label">Spikes detected</span>
+        <span class="tile-value mono amber" id="statSpikes">0</span>
+        <span class="tile-sub" id="statSpikesSub">voltage ≥ threshold</span>
+      </div>
+      <div class="panel tile">
+        <span class="tile-label">Spike density</span>
+        <span class="tile-value mono" id="statRate">0.0</span>
+        <span class="tile-sub" id="statRateSub">per 1,000 samples</span>
+      </div>
+      <div class="panel tile">
+        <span class="tile-label">Peak voltage</span>
+        <span class="tile-value mono" id="statPeak">—</span>
+        <span class="tile-sub" id="statPeakSub">µV this session</span>
+      </div>
+    </section>
+
+    <section class="charts">
+      <article class="panel chart-card">
+        <header class="chart-head">
+          <div>
+            <h2>Voltage trace</h2>
+            <p>µV against sample number n</p>
+          </div>
+          <div class="readout mono" id="voltReadout">—</div>
+        </header>
+        <div class="canvas-wrap" id="voltWrap">
+          <canvas id="voltChart" aria-label="Voltage against sample number"></canvas>
+          <div class="tooltip" id="voltTip" hidden></div>
+        </div>
+        <footer class="legend">
+          <span><i class="swatch mint"></i>voltage</span>
+          <span><i class="swatch amber round"></i>spike</span>
+          <span><i class="swatch dash"></i>threshold</span>
+        </footer>
+      </article>
+
+      <article class="panel chart-card">
+        <header class="chart-head">
+          <div>
+            <h2>Spike events</h2>
+            <p>count per sample window, cumulative</p>
+          </div>
+          <div class="readout mono" id="spikeReadout">—</div>
+        </header>
+        <div class="canvas-wrap" id="spikeWrap">
+          <canvas id="spikeChart" aria-label="Spike count against sample number"></canvas>
+          <div class="tooltip" id="spikeTip" hidden></div>
+        </div>
+        <footer class="legend">
+          <span><i class="swatch amber"></i>spikes / bin</span>
+          <span><i class="swatch violet"></i>cumulative</span>
+        </footer>
+      </article>
+    </section>
+
+    <section class="panel log-card">
+      <header class="chart-head">
+        <div>
+          <h2>Spike log</h2>
+          <p>latest threshold crossings, written to disk on the fly</p>
+        </div>
+        <span class="mono hint" id="logCount">0 recorded</span>
+      </header>
+      <table class="log">
+        <thead>
+          <tr><th>#</th><th>sample</th><th>voltage</th><th>t+</th></tr>
+        </thead>
+        <tbody id="logBody">
+          <tr class="empty"><td colspan="4">No spikes yet — press Start sampling</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="footer">
+      <span>Sampling is server-side; this page streams chunks over SSE.</span>
+      <span>Device adapter expects <code>GET</code> → <code>{"voltage": 42.0}</code> or <code>{"samples": […]}</code> in µV.</span>
+      <a href="/docs" target="_blank" rel="noreferrer">API docs</a>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
